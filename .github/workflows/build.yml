@@ -7,14 +7,17 @@ app_name:
 description: "Nom de l'application"
 required: true
 default: "WELLS PAD"
+type: string
 app_url:
-description: "Adresse du site (avec https://)"
+description: "Adresse du site"
 required: true
 default: "https://beautiful-chaja-6e1546.netlify.app"
+type: string
 package_id:
 description: "Identifiant unique de l'application"
 required: true
 default: "com.wells.pad"
+type: string
 
 jobs:
 build:
@@ -22,7 +25,7 @@ runs-on: ubuntu-24.04
 timeout-minutes: 30
 
 steps:
-  - name: Télécharger le code source
+  - name: Recuperer le code
     uses: actions/checkout@v4
 
   - name: Installer Java
@@ -36,7 +39,7 @@ steps:
     with:
       gradle-version: "8.7"
 
-  - name: Créer le projet Android
+  - name: Construire le projet Android
     env:
       APP_NAME: ${{ inputs.app_name }}
       APP_URL: ${{ inputs.app_url }}
@@ -44,22 +47,21 @@ steps:
     run: |
       mkdir -p app/src/main/java/com/webwrap/app
       mkdir -p app/src/main/res/values
-      mkdir -p app/src/main/res/drawable
 
       cat > settings.gradle <<'EOF'
       pluginManagement {
-        repositories {
-          google()
-          mavenCentral()
-          gradlePluginPortal()
-        }
+          repositories {
+              google()
+              mavenCentral()
+              gradlePluginPortal()
+          }
       }
       dependencyResolutionManagement {
-        repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-        repositories {
-          google()
-          mavenCentral()
-        }
+          repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+          repositories {
+              google()
+              mavenCentral()
+          }
       }
       rootProject.name = "WebWrap"
       include ':app'
@@ -67,7 +69,7 @@ steps:
 
       cat > build.gradle <<'EOF'
       plugins {
-        id 'com.android.application' version '8.5.0' apply false
+          id 'com.android.application' version '8.5.0' apply false
       }
       EOF
 
@@ -78,37 +80,31 @@ steps:
 
       cat > app/build.gradle <<'EOF'
       plugins {
-        id 'com.android.application'
+          id 'com.android.application'
       }
 
       android {
-        namespace 'com.webwrap.app'
-        compileSdk 34
+          namespace 'com.webwrap.app'
+          compileSdk 34
 
-        defaultConfig {
-          applicationId project.findProperty('appId') ?: 'com.wells.pad'
-          minSdk 24
-          targetSdk 34
-          versionCode 1
-          versionName '1.0'
-        }
+          defaultConfig {
+              applicationId 'com.wells.pad'
+              minSdk 24
+              targetSdk 34
+              versionCode 1
+              versionName '1.0'
+          }
 
-        compileOptions {
-          sourceCompatibility JavaVersion.VERSION_17
-          targetCompatibility JavaVersion.VERSION_17
-        }
+          compileOptions {
+              sourceCompatibility JavaVersion.VERSION_17
+              targetCompatibility JavaVersion.VERSION_17
+          }
       }
-      EOF
-
-      cat > app/src/main/res/values/strings.xml <<'EOF'
-      <resources>
-        <string name="app_name">WELLS PAD</string>
-        <string name="app_url">https://beautiful-chaja-6e1546.netlify.app</string>
-      </resources>
       EOF
 
       python3 - <<'PY'
       import os
+      import re
       import xml.sax.saxutils
 
       name = xml.sax.saxutils.escape(os.environ["APP_NAME"])
@@ -118,67 +114,61 @@ steps:
       if not url.startswith("https://"):
           raise ValueError("L'adresse doit commencer par https://")
 
-      if not all(part.isalnum() or part == "_" for part in package_id.split(".")) or "." not in package_id:
+      if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+", package_id):
           raise ValueError("Identifiant d'application invalide")
 
-      with open("app/build.gradle", "r", encoding="utf-8") as f:
+      path = "app/build.gradle"
+      with open(path, "r", encoding="utf-8") as f:
           gradle = f.read()
 
       gradle = gradle.replace(
-          "applicationId project.findProperty('appId') ?: 'com.wells.pad'",
+          "applicationId 'com.wells.pad'",
           "applicationId '" + package_id + "'"
       )
 
-      with open("app/build.gradle", "w", encoding="utf-8") as f:
+      with open(path, "w", encoding="utf-8") as f:
           f.write(gradle)
 
       with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
           f.write(
               '<?xml version="1.0" encoding="utf-8"?>\n'
               '<resources>\n'
-              f'    <string name="app_name">{name}</string>\n'
-              f'    <string name="app_url">{url}</string>\n'
+              f'  <string name="app_name">{name}</string>\n'
+              f'  <string name="app_url">{url}</string>\n'
               '</resources>\n'
           )
       PY
 
       cat > app/src/main/res/values/styles.xml <<'EOF'
       <resources>
-        <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
-          <item name="android:fontFamily">sans</item>
-          <item name="android:colorAccent">#2196F3</item>
-          <item name="android:statusBarColor">#0D0E10</item>
-          <item name="android:navigationBarColor">#0D0E10</item>
-          <item name="android:windowLightStatusBar">false</item>
-          <item name="android:windowActionModeOverlay">true</item>
-        </style>
+          <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+              <item name="android:statusBarColor">#0D0E10</item>
+              <item name="android:navigationBarColor">#0D0E10</item>
+          </style>
       </resources>
       EOF
 
       cat > app/src/main/AndroidManifest.xml <<'EOF'
       <?xml version="1.0" encoding="utf-8"?>
       <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <uses-permission android:name="android.permission.INTERNET" />
 
-        <uses-permission android:name="android.permission.INTERNET" />
+          <application
+              android:label="@string/app_name"
+              android:theme="@style/AppTheme"
+              android:usesCleartextTraffic="false">
 
-        <application
-            android:label="@string/app_name"
-            android:theme="@style/AppTheme"
-            android:usesCleartextTraffic="false"
-            android:hardwareAccelerated="true">
+              <activity
+                  android:name=".MainActivity"
+                  android:exported="true"
+                  android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
 
-          <activity
-              android:name=".MainActivity"
-              android:exported="true"
-              android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
-
-            <intent-filter>
-              <action android:name="android.intent.action.MAIN" />
-              <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-          </activity>
-        </application>
+                  <intent-filter>
+                      <action android:name="android.intent.action.MAIN" />
+                      <category android:name="android.intent.category.LAUNCHER" />
+                  </intent-filter>
+              </activity>
+          </application>
       </manifest>
       EOF
 
@@ -196,7 +186,6 @@ steps:
       import android.webkit.WebViewClient;
 
       public class MainActivity extends Activity {
-
           private WebView web;
 
           @Override
@@ -210,7 +199,6 @@ steps:
               settings.setJavaScriptEnabled(true);
               settings.setDomStorageEnabled(true);
               settings.setMediaPlaybackRequiresUserGesture(false);
-              settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
               final String home = getString(R.string.app_url);
               final String homeHost = Uri.parse(home).getHost();
@@ -218,13 +206,11 @@ steps:
               web.setWebViewClient(new WebViewClient() {
                   @Override
                   public boolean shouldOverrideUrlLoading(
-                          WebView view,
-                          WebResourceRequest request) {
-
+                          WebView view, WebResourceRequest request) {
                       Uri uri = request.getUrl();
 
-                      if (uri.getHost() != null
-                              && uri.getHost().equalsIgnoreCase(homeHost)) {
+                      if (uri.getHost() != null &&
+                              uri.getHost().equalsIgnoreCase(homeHost)) {
                           return false;
                       }
 
@@ -249,7 +235,6 @@ steps:
           @Override
           protected void onSaveInstanceState(Bundle outState) {
               super.onSaveInstanceState(outState);
-
               if (web != null) {
                   web.saveState(outState);
               }
@@ -263,28 +248,18 @@ steps:
                   super.onBackPressed();
               }
           }
-
-          @Override
-          protected void onDestroy() {
-              if (web != null) {
-                  web.destroy();
-                  web = null;
-              }
-
-              super.onDestroy();
-          }
       }
       EOF
 
   - name: Construire l'APK
     run: gradle --no-daemon assembleDebug
 
-  - name: Préparer le fichier APK
+  - name: Preparer le fichier APK
     run: |
       mkdir -p sortie
       cp app/build/outputs/apk/debug/app-debug.apk sortie/WELLS-PAD.apk
 
-  - name: Publier l'APK à télécharger
+  - name: Publier l'APK
     uses: actions/upload-artifact@v4
     with:
       name: WELLS-PAD-APK
