@@ -1,352 +1,293 @@
-name: Build APK
+name: Construire APK
 
 on:
-  workflow_dispatch:
-    inputs:
-      app_name:
-        description: "Nom de l'application"
-        required: true
-        default: "WELLS PAD"
-      app_url:
-        description: "Adresse du site (avec https://)"
-        required: true
-        default: "https://beautiful-chaja-6e1546.netlify.app"
-      package_id:
-        description: "Identifiant unique de l'app (minuscules, ex: com.wells.pad)"
-        required: true
-        default: "com.wells.pad"
+workflow_dispatch:
+inputs:
+app_name:
+description: "Nom de l'application"
+required: true
+default: "WELLS PAD"
+app_url:
+description: "Adresse du site (avec https://)"
+required: true
+default: "https://beautiful-chaja-6e1546.netlify.app"
+package_id:
+description: "Identifiant unique de l'application"
+required: true
+default: "com.wells.pad"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+build:
+runs-on: ubuntu-24.04
+timeout-minutes: 30
 
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.7"
+steps:
+  - name: Télécharger le code source
+    uses: actions/checkout@v4
 
-      - name: Creer le projet Android
-        env:
-          APP_NAME: ${{ inputs.app_name }}
-          APP_URL: ${{ inputs.app_url }}
-        run: |
-          mkdir -p app/src/main/java/com/webwrap/app app/src/main/res/values app/src/main/res/mipmap-xxxhdpi
+  - name: Installer Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: "17"
 
-          cat > settings.gradle <<'EOF'
-          pluginManagement {
-            repositories {
-              google()
-              mavenCentral()
-              gradlePluginPortal()
-            }
-          }
-          dependencyResolutionManagement {
-            repositories {
-              google()
-              mavenCentral()
-            }
-          }
-          rootProject.name = "WebWrap"
-          include ':app'
-          EOF
+  - name: Installer Gradle
+    uses: gradle/actions/setup-gradle@v4
+    with:
+      gradle-version: "8.7"
 
-          cat > build.gradle <<'EOF'
-          plugins {
-            id 'com.android.application' version '8.5.0' apply false
-          }
-          EOF
+  - name: Créer le projet Android
+    env:
+      APP_NAME: ${{ inputs.app_name }}
+      APP_URL: ${{ inputs.app_url }}
+      APP_ID: ${{ inputs.package_id }}
+    run: |
+      mkdir -p app/src/main/java/com/webwrap/app
+      mkdir -p app/src/main/res/values
+      mkdir -p app/src/main/res/drawable
 
-          cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2g
-          android.useAndroidX=false
-          EOF
+      cat > settings.gradle <<'EOF'
+      pluginManagement {
+        repositories {
+          google()
+          mavenCentral()
+          gradlePluginPortal()
+        }
+      }
+      dependencyResolutionManagement {
+        repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+        repositories {
+          google()
+          mavenCentral()
+        }
+      }
+      rootProject.name = "WebWrap"
+      include ':app'
+      EOF
 
-          cat > app/build.gradle <<'EOF'
-          plugins {
-            id 'com.android.application'
-          }
-          android {
-            namespace 'com.webwrap.app'
-            compileSdk 34
-            defaultConfig {
-              applicationId (project.findProperty('appId') ?: 'com.wells.pad')
-              minSdk 24
-              targetSdk 34
-              versionCode 1
-              versionName '1.0'
-            }
-            compileOptions {
-              sourceCompatibility JavaVersion.VERSION_17
-              targetCompatibility JavaVersion.VERSION_17
-            }
-          }
-          EOF
+      cat > build.gradle <<'EOF'
+      plugins {
+        id 'com.android.application' version '8.5.0' apply false
+      }
+      EOF
 
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <uses-permission android:name="android.permission.INTERNET" />
-            <application
-              android:icon="@mipmap/ic_launcher"
-              android:label="@string/app_name"
-              android:theme="@style/AppTheme"
-              android:usesCleartextTraffic="false">
-              <activity
-                android:name=".MainActivity"
-                android:exported="true"
-                android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
-                <intent-filter>
-                  <action android:name="android.intent.action.MAIN" />
-                  <category android:name="android.intent.category.LAUNCHER" />
-                </intent-filter>
-              </activity>
-            </application>
-          </manifest>
-          EOF
+      cat > gradle.properties <<'EOF'
+      org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+      android.useAndroidX=true
+      EOF
 
-          cat > app/src/main/res/values/styles.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-            <style name="AppTheme" parent="android:Theme.DeviceDefault.NoActionBar">
-              <item name="android:statusBarColor">#0d0e10</item>
-              <item name="android:navigationBarColor">#0d0e10</item>
-              <item name="android:windowBackground">#0d0e10</item>
-            </style>
-          </resources>
-          EOF
+      cat > app/build.gradle <<'EOF'
+      plugins {
+        id 'com.android.application'
+      }
 
-          cat > app/src/main/java/com/webwrap/app/MainActivity.java <<'EOF'
-          package com.webwrap.app;
+      android {
+        namespace 'com.webwrap.app'
+        compileSdk 34
 
-          import android.app.Activity;
-          import android.content.Intent;
-          import android.net.Uri;
-          import android.os.Bundle;
-          import android.webkit.WebChromeClient;
-          import android.webkit.WebResourceRequest;
-          import android.webkit.WebSettings;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
+        defaultConfig {
+          applicationId project.findProperty('appId') ?: 'com.wells.pad'
+          minSdk 24
+          targetSdk 34
+          versionCode 1
+          versionName '1.0'
+        }
 
-          public class MainActivity extends Activity {
-            private WebView web;
+        compileOptions {
+          sourceCompatibility JavaVersion.VERSION_17
+          targetCompatibility JavaVersion.VERSION_17
+        }
+      }
+      EOF
 
-            @Override
-            protected void onCreate(Bundle state) {
+      cat > app/src/main/res/values/strings.xml <<'EOF'
+      <resources>
+        <string name="app_name">WELLS PAD</string>
+        <string name="app_url">https://beautiful-chaja-6e1546.netlify.app</string>
+      </resources>
+      EOF
+
+      python3 - <<'PY'
+      import os
+      import xml.sax.saxutils
+
+      name = xml.sax.saxutils.escape(os.environ["APP_NAME"])
+      url = xml.sax.saxutils.escape(os.environ["APP_URL"])
+      package_id = os.environ["APP_ID"]
+
+      if not url.startswith("https://"):
+          raise ValueError("L'adresse doit commencer par https://")
+
+      if not all(part.isalnum() or part == "_" for part in package_id.split(".")) or "." not in package_id:
+          raise ValueError("Identifiant d'application invalide")
+
+      with open("app/build.gradle", "r", encoding="utf-8") as f:
+          gradle = f.read()
+
+      gradle = gradle.replace(
+          "applicationId project.findProperty('appId') ?: 'com.wells.pad'",
+          "applicationId '" + package_id + "'"
+      )
+
+      with open("app/build.gradle", "w", encoding="utf-8") as f:
+          f.write(gradle)
+
+      with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
+          f.write(
+              '<?xml version="1.0" encoding="utf-8"?>\n'
+              '<resources>\n'
+              f'    <string name="app_name">{name}</string>\n'
+              f'    <string name="app_url">{url}</string>\n'
+              '</resources>\n'
+          )
+      PY
+
+      cat > app/src/main/res/values/styles.xml <<'EOF'
+      <resources>
+        <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+          <item name="android:fontFamily">sans</item>
+          <item name="android:colorAccent">#2196F3</item>
+          <item name="android:statusBarColor">#0D0E10</item>
+          <item name="android:navigationBarColor">#0D0E10</item>
+          <item name="android:windowLightStatusBar">false</item>
+          <item name="android:windowActionModeOverlay">true</item>
+        </style>
+      </resources>
+      EOF
+
+      cat > app/src/main/AndroidManifest.xml <<'EOF'
+      <?xml version="1.0" encoding="utf-8"?>
+      <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+        <uses-permission android:name="android.permission.INTERNET" />
+
+        <application
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme"
+            android:usesCleartextTraffic="false"
+            android:hardwareAccelerated="true">
+
+          <activity
+              android:name=".MainActivity"
+              android:exported="true"
+              android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
+
+            <intent-filter>
+              <action android:name="android.intent.action.MAIN" />
+              <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+          </activity>
+        </application>
+      </manifest>
+      EOF
+
+      cat > app/src/main/java/com/webwrap/app/MainActivity.java <<'EOF'
+      package com.webwrap.app;
+
+      import android.app.Activity;
+      import android.content.Intent;
+      import android.net.Uri;
+      import android.os.Bundle;
+      import android.webkit.WebChromeClient;
+      import android.webkit.WebResourceRequest;
+      import android.webkit.WebSettings;
+      import android.webkit.WebView;
+      import android.webkit.WebViewClient;
+
+      public class MainActivity extends Activity {
+
+          private WebView web;
+
+          @Override
+          protected void onCreate(Bundle state) {
               super.onCreate(state);
+
               web = new WebView(this);
               setContentView(web);
-              WebSettings s = web.getSettings();
-              s.setJavaScriptEnabled(true);
-              s.setDomStorageEnabled(true);
-              s.setMediaPlaybackRequiresUserGesture(false);
-              s.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+              WebSettings settings = web.getSettings();
+              settings.setJavaScriptEnabled(true);
+              settings.setDomStorageEnabled(true);
+              settings.setMediaPlaybackRequiresUserGesture(false);
+              settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+
               final String home = getString(R.string.app_url);
               final String homeHost = Uri.parse(home).getHost();
+
               web.setWebViewClient(new WebViewClient() {
-                @Override
-                public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
-                  Uri u = r.getUrl();
-                  if (u.getHost() != null && u.getHost().equals(homeHost)) return false;
-                  try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, u));
-                  } catch (Exception e) { }
-                  return true;
-                }
+                  @Override
+                  public boolean shouldOverrideUrlLoading(
+                          WebView view,
+                          WebResourceRequest request) {
+
+                      Uri uri = request.getUrl();
+
+                      if (uri.getHost() != null
+                              && uri.getHost().equalsIgnoreCase(homeHost)) {
+                          return false;
+                      }
+
+                      try {
+                          startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                      } catch (Exception ignored) {
+                      }
+
+                      return true;
+                  }
               });
+
               web.setWebChromeClient(new WebChromeClient());
+
               if (state == null) {
-                web.loadUrl(home);
+                  web.loadUrl(home);
               } else {
-                web.restoreState(state);
+                  web.restoreState(state);
               }
-            }
-
-            @Override
-            protected void onSaveInstanceState(Bundle out) {
-              super.onSaveInstanceState(out);
-              web.saveState(out);
-            }
-
-            @Override
-            public void onBackPressed() {
-              if (web.canGoBack()) {
-                web.goBack();
-              } else {
-                super.onBackPressed();
-              }
-            }
           }
-          EOF
 
-          python3 - <<'PY'
-          import os
-          from xml.sax.saxutils import escape
-          name = escape(os.environ["APP_NAME"]).replace("'", "\\'")
-          url = escape(os.environ["APP_URL"].strip())
-          with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
-              f.write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n')
-              f.write('  <string name="app_name">' + name + '</string>\n')
-              f.write('  <string name="app_url">' + url + '</string>\n')
-              f.write('</resources>\n')
-          PY
+          @Override
+          protected void onSaveInstanceState(Bundle outState) {
+              super.onSaveInstanceState(outState);
 
-          cat > icon.b64 <<'EOF'
-          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
-          /f7
+              if (web != null) {
+                  web.saveState(outState);
+              }
+          }
+
+          @Override
+          public void onBackPressed() {
+              if (web != null && web.canGoBack()) {
+                  web.goBack();
+              } else {
+                  super.onBackPressed();
+              }
+          }
+
+          @Override
+          protected void onDestroy() {
+              if (web != null) {
+                  web.destroy();
+                  web = null;
+              }
+
+              super.onDestroy();
+          }
+      }
+      EOF
+
+  - name: Construire l'APK
+    run: gradle --no-daemon assembleDebug
+
+  - name: Préparer le fichier APK
+    run: |
+      mkdir -p sortie
+      cp app/build/outputs/apk/debug/app-debug.apk sortie/WELLS-PAD.apk
+
+  - name: Publier l'APK à télécharger
+    uses: actions/upload-artifact@v4
+    with:
+      name: WELLS-PAD-APK
+      path: sortie/WELLS-PAD.apk
+      if-no-files-found: error
+      retention-days: 14
